@@ -1,6 +1,6 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types } from 'mongoose';
+import { Connection, Model, ObjectId, Types } from 'mongoose';
 import { PostDocument } from '../../db/schema/post';
 import {
   GetList,
@@ -156,7 +156,7 @@ export class PostsService {
         // 去掉开头的# 前言
         intro = intro.slice(2);
         type.intro = intro;
-        if (tree === undefined || tree === []) {
+        if (tree === undefined || (Array.isArray(tree)&&tree.length===0) ) {
           console.log('注意最高级标题以#开头', file);
         }
         this.saveAll(type);
@@ -219,7 +219,7 @@ export class PostsService {
       console.log(tree);
     }
   }
-  async saveAll(obj:PostType) {
+  async saveAll(obj: PostType) {
     let tagIdArr = [];
     let categoryIdArr = [];
     for (const item of obj.tags) {
@@ -315,16 +315,54 @@ export class PostsService {
   }
 
   async getList(query: GetPostDto): Promise<GetList> {
-    let { page = 1, pageSize = 10 } = query;
-    if (pageSize > 20) {
-      pageSize = 20;
+    let { page = 1, pageSize = 10, postName, categoryName, tagName } = query;
+    if (pageSize > 40) {
+      pageSize = 40;
     }
-    const count = await this.postModel.countDocuments({});
+    interface Selection {
+      $or: any;
+      tags: null | ObjectId;
+      categories: null | ObjectId;
+    }
+    let selection:Selection = {
+      $or: [
+        {
+          title: { $regex: new RegExp(postName, 'i') },
+        },
+      ],
+      tags: null,
+      categories: null,
+    };
+    type tagData = TagDocument[] | []
+    let tagData:tagData = [];
+    if (tagName) {
+      tagData = await this.tagModel.find({
+        name: tagName,
+      });
+      if (tagData && tagData.length > 0) {
+        selection.tags = tagData?.[0]?._id;
+      }
+    } else {
+      delete selection.tags;
+    }
+    type cateData = CategoryDocument[] | []
+    let cateData:cateData = [];
+    if (categoryName) {
+      cateData = await this.categoryModel.find({
+        name: categoryName,
+      });
+      if (cateData && cateData.length > 0) {
+        selection.categories = cateData?.[0]?._id;
+      }
+    } else {
+      delete selection.categories;
+    }
+    const count:number = await this.postModel.countDocuments(selection);
     if (!count) {
       throw new HttpException('文章数据库没有内容', 401);
     }
     const data = await this.postModel
-      .find({})
+      .find(selection)
       .populate([
         {
           path: 'categories',
@@ -337,12 +375,10 @@ export class PostsService {
           select: 'name',
         },
       ])
-      .sort({
-        date: -1,
-      })
+      .sort({ _id: 1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
-      .select({ toc: 0, url: 0 });
+      .select({ toc: 0, url: 0, __v: 0 });
     return {
       totalPage: Math.ceil(count / pageSize),
       count: data.length,

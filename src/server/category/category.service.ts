@@ -13,11 +13,12 @@ import moment from 'moment';
 @Injectable()
 export class CategoryService {
   constructor(
-    @InjectModel('Categories') private readonly categoryModel: Model<CategoryDocument>, // @InjectModel('Posts') private readonly postModel: Model<PostDocument>,
+    @InjectModel('Categories')
+    private readonly categoryModel: Model<CategoryDocument>, // @InjectModel('Posts') private readonly postModel: Model<PostDocument>,
   ) {}
 
   async getCategories(query: GetCategoriesDto): Promise<GetCategories> {
-    let { searchText, page = 1, pageSize = 30 } = query;
+    let { searchText, page = 1, pageSize } = query;
     let selection = {};
     if (searchText) {
       const reg = new RegExp(searchText, 'i');
@@ -32,15 +33,23 @@ export class CategoryService {
     if (!count && count !== 0) {
       throw new HttpException('无目录数据', 401);
     }
-    const data = await this.categoryModel
-      .find(selection)
-      .sort({ count: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .select({ __v: 0 });
+    let data;
+    if (pageSize) {
+      data = await this.categoryModel
+        .find(selection)
+        .sort({ count: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .select({ __v: 0 });
+    } else {
+      data = await this.categoryModel
+        .find(selection)
+        .sort({ count: -1 })
+        .select({ __v: 0 });
+    }
     return {
       data,
-      totalPage: Math.ceil(count / pageSize),
+      totalPage: pageSize?Math.ceil(count / pageSize):1,
     };
   }
 

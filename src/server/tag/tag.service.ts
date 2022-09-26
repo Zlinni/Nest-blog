@@ -17,31 +17,35 @@ export class TagService {
   ) {}
 
   async getTags(query: GetTagsDto): Promise<GetTags> {
-    console.log('querygetTags',query)
-    let { searchText, page = 1, pageSize = 30 } = query;
+    let { searchText, page = 1, pageSize } = query;
     let selection = {};
     if (searchText) {
       const reg = new RegExp(searchText, 'i');
       selection = {
-        $or: [
-          //多条件，数组
-          { name: { $regex: reg } },
-        ],
+        $or: [{ name: { $regex: reg } }],
       };
     }
     const count = await this.tagModel.countDocuments(selection);
     if (!count && count !== 0) {
       throw new HttpException('无标签数据', 401);
     }
-    const data = await this.tagModel
-      .find(selection)
-      .sort({ count: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .select({ __v: 0 });
+    let data;
+    if (!pageSize) {
+      data = await this.tagModel
+        .find(selection)
+        .sort({ count: -1 })
+        .select({ __v: 0 });
+    } else {
+      data = await this.tagModel
+        .find(selection)
+        .sort({ count: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .select({ __v: 0 });
+    }
     return {
       data,
-      totalPage: Math.ceil(count / pageSize),
+      totalPage: pageSize?Math.ceil(count / pageSize):1,
     };
   }
 
