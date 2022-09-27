@@ -156,7 +156,7 @@ export class PostsService {
         // 去掉开头的# 前言
         intro = intro.slice(2);
         type.intro = intro;
-        if (tree === undefined || (Array.isArray(tree)&&tree.length===0) ) {
+        if (tree === undefined || (Array.isArray(tree) && tree.length === 0)) {
           console.log('注意最高级标题以#开头', file);
         }
         this.saveAll(type);
@@ -315,26 +315,34 @@ export class PostsService {
   }
 
   async getList(query: GetPostDto): Promise<GetList> {
-    let { page = 1, pageSize = 10, postName, categoryName, tagName } = query;
+    let { page = 1, pageSize = 10, postName, categoryName, tagName, range } = query;
+    let startTime: string, endTime: string;
+    interface Selection {
+      $or?: any;
+      $and?: any
+      tags?: ObjectId;
+      categories?: ObjectId;
+    }
+    if (range) {
+      [startTime, endTime] = range.split(',');
+    } 
+    let selection: Selection = {
+      tags: null,
+      categories: null,
+      $and: [{
+        title: { $regex: new RegExp(postName, 'i') },
+      }, { date: { $gt: startTime } }, { date: { $lt: endTime } }]
+    };
+    if(!range){
+      selection.$and.pop()
+      selection.$and.pop()
+    }
+
     if (pageSize > 40) {
       pageSize = 40;
     }
-    interface Selection {
-      $or: any;
-      tags: null | ObjectId;
-      categories: null | ObjectId;
-    }
-    let selection:Selection = {
-      $or: [
-        {
-          title: { $regex: new RegExp(postName, 'i') },
-        },
-      ],
-      tags: null,
-      categories: null,
-    };
     type tagData = TagDocument[] | []
-    let tagData:tagData = [];
+    let tagData: tagData = [];
     if (tagName) {
       tagData = await this.tagModel.find({
         name: tagName,
@@ -346,7 +354,7 @@ export class PostsService {
       delete selection.tags;
     }
     type cateData = CategoryDocument[] | []
-    let cateData:cateData = [];
+    let cateData: cateData = [];
     if (categoryName) {
       cateData = await this.categoryModel.find({
         name: categoryName,
@@ -357,7 +365,7 @@ export class PostsService {
     } else {
       delete selection.categories;
     }
-    const count:number = await this.postModel.countDocuments(selection);
+    const count: number = await this.postModel.countDocuments(selection);
     if (!count) {
       throw new HttpException('文章数据库没有内容', 401);
     }

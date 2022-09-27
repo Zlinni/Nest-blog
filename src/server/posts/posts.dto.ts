@@ -4,6 +4,7 @@ export class GetPostDto {
   readonly postName:string;
   readonly tagName: string;
   readonly categoryName: string;
+  readonly range: string;
   @IsOptional()
   @IsPositive()
   page: number;
