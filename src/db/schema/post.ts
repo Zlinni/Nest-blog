@@ -17,7 +17,7 @@ export class Post extends Document {
   @Prop()
   abbrlink: number;
   @Prop()
-  date: string;
+  date: Date;
   @Prop()
   top: number;
   @Prop()
@@ -25,7 +25,7 @@ export class Post extends Document {
   @Prop()
   url: string;
   @Prop()
-  updateTime: string;
+  updateTime: Date;
   @Prop()
   toc: string;
   @Prop()

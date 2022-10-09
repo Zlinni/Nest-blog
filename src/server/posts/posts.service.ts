@@ -323,25 +323,33 @@ export class PostsService {
   }
 
   async getList(query: GetPostDto): Promise<GetList> {
-    let { page = 1, pageSize = 10, postName, categoryName, tagName } = query;
+    let { page = 1, pageSize = 10, postName, categoryName, tagName, range } = query;
+    let startTime: string, endTime: string;
+    interface Selection {
+      $or?: any;
+      $and?: any
+      tags?: ObjectId;
+      categories?: ObjectId;
+    }
+    if (range) {
+      [startTime, endTime] = range.split(',');
+    } 
+    let selection: Selection = {
+      tags: null,
+      categories: null,
+      $and: [{
+        title: { $regex: new RegExp(postName, 'i') },
+      }, { date: { $gt: startTime } }, { date: { $lt: endTime } }]
+    };
+    type tagData = TagDocument[] | [];
+    if(!range){
+      selection.$and.pop()
+      selection.$and.pop()
+    }
+
     if (pageSize > 40) {
       pageSize = 40;
     }
-    interface Selection {
-      $or: any;
-      tags: null | ObjectId;
-      categories: null | ObjectId;
-    }
-    let selection: Selection = {
-      $or: [
-        {
-          title: { $regex: new RegExp(postName, 'i') },
-        },
-      ],
-      tags: null,
-      categories: null,
-    };
-    type tagData = TagDocument[] | [];
     let tagData: tagData = [];
     if (tagName) {
       tagData = await this.tagModel.find({
