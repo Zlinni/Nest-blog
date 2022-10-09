@@ -1,7 +1,8 @@
 // import { Document } from 'mongoose';
 import { IsOptional, IsPositive } from 'class-validator';
+import { ObjectId } from 'mongoose';
 export class GetPostDto {
-  readonly postName:string;
+  readonly postName: string;
   readonly tagName: string;
   readonly categoryName: string;
   @IsOptional()
@@ -13,7 +14,7 @@ export class GetPostDto {
 }
 
 export class ReadPostDto {
-  readonly abbrlink: string;
+  readonly _id: ObjectId;
 }
 
 export class GetTagListDto {
@@ -34,4 +35,30 @@ export class GetCategoriesListDto {
   @IsOptional()
   @IsPositive()
   pageSize: number;
+}
+
+export class AddPostDto {
+  readonly textValue: string;
+  readonly textTitle: string;
+  readonly categories: string;
+
+}
+
+export class ModifyPostDto{
+  readonly _id:string;
+  readonly textValue: string;
+  readonly textTitle: string;
+  readonly categories: string;
+}
+
+export class DeletePostDto{
+  readonly _id:string;
+}
+
+export class ImportPostDto{
+
+}
+
+export class OutputPostDto{
+  readonly _id:string;
 }

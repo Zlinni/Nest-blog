@@ -1,7 +1,9 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, ObjectId, Types } from 'mongoose';
 import { PostDocument } from '../../db/schema/post';
+import { parse, stringify } from 'yaml';
+import * as del from 'del';
 import {
   GetList,
   ReadPost,
@@ -12,10 +14,15 @@ import {
   Tree,
 } from './posts.interface';
 import {
+  AddPostDto,
+  ModifyPostDto,
   GetCategoriesListDto,
   GetPostDto,
   GetTagListDto,
   ReadPostDto,
+  DeletePostDto,
+  ImportPostDto,
+  OutputPostDto,
 } from './posts.dto';
 import { readArticle } from '../../utils/readArticle';
 import { TagDocument } from 'src/db/schema/tag';
@@ -24,6 +31,7 @@ import dayjs from 'dayjs';
 import * as fs from 'fs';
 import { glob } from 'glob';
 import * as readline from 'readline';
+import { response } from 'express';
 @Injectable()
 export class PostsService {
   tagMap: Map<any, any>;
@@ -156,7 +164,7 @@ export class PostsService {
         // 去掉开头的# 前言
         intro = intro.slice(2);
         type.intro = intro;
-        if (tree === undefined || (Array.isArray(tree)&&tree.length===0) ) {
+        if (tree === undefined || (Array.isArray(tree) && tree.length === 0)) {
           console.log('注意最高级标题以#开头', file);
         }
         this.saveAll(type);
@@ -324,7 +332,7 @@ export class PostsService {
       tags: null | ObjectId;
       categories: null | ObjectId;
     }
-    let selection:Selection = {
+    let selection: Selection = {
       $or: [
         {
           title: { $regex: new RegExp(postName, 'i') },
@@ -333,8 +341,8 @@ export class PostsService {
       tags: null,
       categories: null,
     };
-    type tagData = TagDocument[] | []
-    let tagData:tagData = [];
+    type tagData = TagDocument[] | [];
+    let tagData: tagData = [];
     if (tagName) {
       tagData = await this.tagModel.find({
         name: tagName,
@@ -345,8 +353,8 @@ export class PostsService {
     } else {
       delete selection.tags;
     }
-    type cateData = CategoryDocument[] | []
-    let cateData:cateData = [];
+    type cateData = CategoryDocument[] | [];
+    let cateData: cateData = [];
     if (categoryName) {
       cateData = await this.categoryModel.find({
         name: categoryName,
@@ -357,7 +365,7 @@ export class PostsService {
     } else {
       delete selection.categories;
     }
-    const count:number = await this.postModel.countDocuments(selection);
+    const count: number = await this.postModel.countDocuments(selection);
     if (!count) {
       throw new HttpException('文章数据库没有内容', 401);
     }
@@ -375,7 +383,7 @@ export class PostsService {
           select: 'name',
         },
       ])
-      .sort({ _id: 1 })
+      .sort({ date: -1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
       .select({ toc: 0, url: 0, __v: 0 });
@@ -385,17 +393,16 @@ export class PostsService {
       data,
     };
   }
-
   async readPost(query: ReadPostDto): Promise<ReadPost> {
-    const { abbrlink } = query;
-    console.log(abbrlink, 'readpost');
-    const reg = /^[0-9]*$/;
-    if (!reg.test(abbrlink)) {
-      throw new HttpException('错误链接', 401);
-    }
+    const { _id } = query;
+    // console.log(_id, 'readpost');
+    // const reg = /^[0-9]*$/;
+    // if (!reg.test(abbrlink)) {
+    //   throw new HttpException('错误链接', 401);
+    // }
     const data: Post = await this.postModel
       .findOne({
-        abbrlink: abbrlink,
+        _id,
       })
       .populate({
         path: 'categories',
@@ -404,7 +411,8 @@ export class PostsService {
       })
       .select({ __v: 0, top: 0 });
     console.log(data);
-    const postMd = await readArticle(data.url);
+    // TODO 设置可选项 后面考虑是否需要byteMd作为文章编辑器
+    const postMd = await readArticle(data.url, false);
     data.url = '';
     return {
       data,
@@ -434,7 +442,6 @@ export class PostsService {
     if (tagData.count === 0) {
       throw new HttpException('该标签分类下无文章', 401);
     }
-    console.log(tagData, 'tagData');
     const data = await this.postModel
       .find({
         tags: {
@@ -479,6 +486,108 @@ export class PostsService {
       data,
       count: categoryData.count,
       totalPage: Math.ceil(categoryData.count / pageSize),
+    };
+  }
+
+  async addPost(Body: AddPostDto): Promise<any> {
+    let { textValue, textTitle, categories } = Body;
+    if (!textValue) {
+      throw new HttpException('请输入文章内容', 401);
+    }
+    if (!textTitle) {
+      throw new HttpException('请输入文章标题', 401);
+    }
+    // TODO 这里按理来说要做成只取一级目录的
+    if (categories && categories.includes(',')) {
+      categories = categories.replace(/,/, '/');
+    }
+    const fileName = this.catalog + '/' + categories + '/' + textTitle + '.md';
+    // 千万注意每次创建文件流之后要关闭它 避免无法删除文件的情况产生
+    const fd = fs.openSync(fileName, 'wx');
+    fs.writeFileSync(fileName, textValue);
+    fs.closeSync(fd);
+    await this.createPost();
+    return {
+      msg: '创建成功',
+    };
+  }
+  // 修改文章
+  async modifyPost(Body: ModifyPostDto): Promise<any> {
+    // 修改的方法有两种
+    // 一先找到数据库中对应文件的url并删除本地的文件，然后把数据库对应文件删除，之后重新全量读写，
+    // 二是对比目录是否需要删除，如果目录不变就更新具体的值，如果目录变了就改变目录。但是还要改变本地文件的路径，所以操作起来更麻烦
+    // 选择一方法
+    let { textValue, textTitle, _id } = Body;
+    if (!textValue) {
+      throw new HttpException('请输入文章内容', 401);
+    }
+    if (!textTitle) {
+      throw new HttpException('请输入文章标题', 401);
+    }
+    await this.deletePost({ _id });
+    await this.addPost(Body);
+    return {
+      msg: '更新成功',
+    };
+  }
+  // 删除文章
+  async deletePost(Body: DeletePostDto): Promise<any> {
+    const { _id } = Body;
+    const sqlCatelogData = await this.postModel
+      .find({
+        _id,
+      })
+      .select({
+        url: 1,
+      });
+    if (sqlCatelogData && sqlCatelogData.length > 0) {
+      const fileName = sqlCatelogData[0].url;
+      try {
+        // 删除本地对应文件
+        if (fs.existsSync(fileName)) {
+          // 千万注意每次创建文件流之后要关闭它 避免无法删除文件的情况产生
+          const tempFile = fs.openSync(fileName, 'r');
+          fs.closeSync(tempFile);
+          fs.unlinkSync(fileName);
+          // 并删除sql中的
+          await this.postModel.deleteOne({ _id });
+        } else {
+          console.log('inexistence path：', fileName);
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    } else {
+      throw new HttpException('数据库没有此文章', 401);
+    }
+    return {
+      msg: '删除成功',
+    };
+  }
+  // 导入文章并解析
+  async importPost(
+    Body: ImportPostDto,
+    UploadedFiles: Array<Express.Multer.File>,
+  ): Promise<any> {
+    // 思路是导入有两种选择 一种是带format的,一种是不带的
+    // 带format的直接解析,根据目录路径导入到具体的地址
+    // 不带format的需要先设置好参数,然后生成format并根据参数导入到具体地址
+  }
+  // 导出文章并解析
+  async outputPost(query: OutputPostDto): Promise<any> {
+    const { _id } = query;
+    const postData = await this.postModel
+      .find({
+        _id,
+      })
+      .select({ url: 1,title:1 });
+    if(!postData||postData.length===0){
+      throw new BadRequestException('无此文章');
+    }
+    const {url,title} = postData[0]
+    return {
+      filePath:url,
+      fileName:title
     };
   }
 }

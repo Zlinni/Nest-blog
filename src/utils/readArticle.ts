@@ -30,15 +30,17 @@ let md = require('markdown-it')({
 //   return `<${tag} ref="${tag}">`
 // };
 
-async function readArticle(fileName: string): Promise<string> {
+async function readArticle(fileName: string,shouldRenderMd:boolean=true): Promise<string> {
   return await new Promise((resolve) => {
     readFile(fileName, 'utf8', (err, data) => {
       if (err) console.log(err);
-      else {
+      else if(shouldRenderMd){
         let renderData = md.render(data);
         let target = '<hr>';
         renderData = sliceTag(target,target,renderData);
         resolve(renderData)
+      }else{
+        resolve(data)
       }
     });
   });
