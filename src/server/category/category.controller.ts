@@ -10,17 +10,17 @@ export class CategoryController {
   async getCategories(@Query() query: GetCategoriesDto): Promise<GetCategories> {
     return await this.categoryService.getCategories(query);
   }
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @Post('addCategories')
   async addCategories(@Body() body: AddCategoriesDto): Promise<void> {
     return await this.categoryService.addCategories(body);
   }
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @Post('modifyCategories')
   async modifyCategories(@Body() body: ModifyCategoriesDto): Promise<void> {
     return await this.categoryService.modifyCategories(body);
   }
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @Post('deleteCategories')
   async deleteCategories(@Body() body: DeleteCategoriesDto): Promise<void> {
     return await this.categoryService.deleteCategories(body);

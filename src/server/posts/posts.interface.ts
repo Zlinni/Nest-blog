@@ -40,8 +40,8 @@ export interface PostType {
   abbrlink: number;
   date: string;
   wordCount: number;
-  tags:Array<any>;
-  categories: Array<any>;
+  // tags:Array<any>;
+  // categories: Array<any>;
   top: number;
   intro: string;
   url: string;

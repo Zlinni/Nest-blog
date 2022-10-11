@@ -58,6 +58,13 @@ export class PostsService {
       this.deleteAll();
       let that = this;
       const files: Array<string> = glob.sync(this.catalog + '/**/*.md');
+      // TODO 获取目录 有个问题就是是否需要读出目录的下一级目录
+      // const categoryReg = /[\s\S]+\/_posts\/([\s\S]*?)\/[\s\S]+/
+      // const categoryName = new Set();
+      // for (const file of files) {
+        // categoryName.add(file.replace(categoryReg,(p0,p1)=>p1))
+      // }
+      
       for (let i = 0; i < files.length; i++) {
         (function (file) {
           that.readLineAsync(file, [], 0);
@@ -88,8 +95,8 @@ export class PostsService {
         abbrlink: null,
         date: '',
         wordCount: null,
-        tags: [],
-        categories: [],
+        // tags: [],
+        // categories: [],
         top: null,
         intro: '',
         url: '',
@@ -117,7 +124,7 @@ export class PostsService {
               // type
               if (line.startsWith(key)) {
                 if (key === 'tags' || key === 'categories') {
-                  tagOrCateStack.push(key);
+                  // tagOrCateStack.push(key);
                 } else {
                   type[key] = line.slice(key.length + 1).trim();
                 }
@@ -225,66 +232,66 @@ export class PostsService {
     }
   }
   async saveAll(obj: PostType) {
-    let tagIdArr = [];
-    let categoryIdArr = [];
-    for (const item of obj.tags) {
-      if (!this.tagMap.has(item)) {
-        this.tagMap.set(item, 1);
-      } else {
-        this.tagMap.set(item, this.tagMap.get(item) + 1);
-      }
-      let _id = null;
-      if (!this.tagIdMap.has(item)) {
-        _id = new Types.ObjectId();
-        this.tagIdMap.set(item, _id);
-      } else {
-        _id = this.tagIdMap.get(item);
-      }
-      tagIdArr.push(_id);
-      let datas = {
-        _id,
-        name: item,
-        color: '#3f51b5',
-        count: this.tagMap.get(item),
-        createTime: dayjs(new Date()).format('YYYY-MM-DD hh:mm:ss'),
-      };
-      this.tagModel
-        .findOneAndUpdate({ name: item }, { $set: datas }, { upsert: true })
-        .exec((err, data) => {
-          if (err) console.log(err);
-        });
-    }
-    for (const item of obj.categories) {
-      if (!this.categoryMap.has(item)) {
-        this.categoryMap.set(item, 1);
-      } else {
-        this.categoryMap.set(item, this.categoryMap.get(item) + 1);
-      }
-      let _id = null;
-      if (!this.categoryIdMap.has(item)) {
-        _id = new Types.ObjectId();
-        this.categoryIdMap.set(item, _id);
-      } else {
-        _id = this.categoryIdMap.get(item);
-      }
-      categoryIdArr.push(_id);
-      let datas = {
-        _id,
-        name: item,
-        color: '#3f51b5',
-        count: this.categoryMap.get(item),
-        createTime: dayjs(new Date()).format('YYYY-MM-DD hh:mm:ss'),
-      };
-      this.categoryModel
-        .findOneAndUpdate({ name: item }, { $set: datas }, { upsert: true })
-        .exec((err, data) => {
-          if (err) console.log(err);
-        });
-    }
+    // let tagIdArr = [];
+    // let categoryIdArr = [];
+    // for (const item of obj.tags) {
+    //   if (!this.tagMap.has(item)) {
+    //     this.tagMap.set(item, 1);
+    //   } else {
+    //     this.tagMap.set(item, this.tagMap.get(item) + 1);
+    //   }
+    //   let _id = null;
+    //   if (!this.tagIdMap.has(item)) {
+    //     _id = new Types.ObjectId();
+    //     this.tagIdMap.set(item, _id);
+    //   } else {
+    //     _id = this.tagIdMap.get(item);
+    //   }
+    //   tagIdArr.push(_id);
+    //   let datas = {
+    //     _id,
+    //     name: item,
+    //     color: '#3f51b5',
+    //     count: this.tagMap.get(item),
+    //     createTime: dayjs(new Date()).format('YYYY-MM-DD hh:mm:ss'),
+    //   };
+    //   this.tagModel
+    //     .findOneAndUpdate({ name: item }, { $set: datas }, { upsert: true })
+    //     .exec((err, data) => {
+    //       if (err) console.log(err);
+    //     });
+    // }
+    // for (const item of obj.categories) {
+    //   if (!this.categoryMap.has(item)) {
+    //     this.categoryMap.set(item, 1);
+    //   } else {
+    //     this.categoryMap.set(item, this.categoryMap.get(item) + 1);
+    //   }
+    //   let _id = null;
+    //   if (!this.categoryIdMap.has(item)) {
+    //     _id = new Types.ObjectId();
+    //     this.categoryIdMap.set(item, _id);
+    //   } else {
+    //     _id = this.categoryIdMap.get(item);
+    //   }
+    //   categoryIdArr.push(_id);
+    //   let datas = {
+    //     _id,
+    //     name: item,
+    //     color: '#3f51b5',
+    //     count: this.categoryMap.get(item),
+    //     createTime: dayjs(new Date()).format('YYYY-MM-DD hh:mm:ss'),
+    //   };
+    //   this.categoryModel
+    //     .findOneAndUpdate({ name: item }, { $set: datas }, { upsert: true })
+    //     .exec((err, data) => {
+    //       if (err) console.log(err);
+    //     });
+    // }
     let datas = {
       ...obj,
-      tags: [...tagIdArr],
-      categories: [...categoryIdArr],
+      // tags: [...tagIdArr],
+      // categories: [...categoryIdArr],
     };
     this.postModel
       .findOneAndUpdate(
@@ -307,16 +314,16 @@ export class PostsService {
         console.log(err);
       }
     });
-    this.tagModel.deleteMany({}, (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
-    this.categoryModel.deleteMany({}, (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
+    // this.tagModel.deleteMany({}, (err) => {
+    //   if (err) {
+    //     console.log(err);
+    //   }
+    // });
+    // this.categoryModel.deleteMany({}, (err) => {
+    //   if (err) {
+    //     console.log(err);
+    //   }
+    // });
   }
 
   async getList(query: GetPostDto): Promise<GetList> {

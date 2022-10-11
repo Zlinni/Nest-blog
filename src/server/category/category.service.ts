@@ -9,13 +9,17 @@ import {
   ModifyCategoriesDto,
 } from './category.dto';
 import { GetCategories } from './category.interface';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import * as fs from 'fs';
 @Injectable()
 export class CategoryService {
+  catalog:string
   constructor(
     @InjectModel('Categories')
     private readonly categoryModel: Model<CategoryDocument>, // @InjectModel('Posts') private readonly postModel: Model<PostDocument>,
-  ) {}
+  ) {
+    this.catalog = process.env.BLOG_LOCAL;
+  }
 
   async getCategories(query: GetCategoriesDto): Promise<GetCategories> {
     let { searchText, page = 1, pageSize } = query;
@@ -58,12 +62,14 @@ export class CategoryService {
     const datas = {
       ...Body,
       count: 0,
-      createTime: moment(new Date()).format('YYYY-MM-DD hh:mm:ss'),
+      createTime: dayjs(new Date()).format('YYYY-MM-DD hh:mm:ss'),
     };
     const data = await this.categoryModel.find({ name });
     if (data.length > 0) {
       throw new HttpException('有重复数据', 401);
     } else {
+      // TODO 在post的service里面当添加文章并改变的时候引用数+1
+      await fs.promises.mkdir(this.catalog+'/'+name)
       await this.categoryModel.create(datas);
     }
   }
